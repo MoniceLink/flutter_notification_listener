@@ -132,7 +132,10 @@ class NotificationEvent {
   /// ```
   /// Image.memory(evt.icon)
   /// ```
-  // Uint8List? icon;
+  Uint8List? smallIcon;
+
+  // package icon
+  Uint8List? icon;
 
   /// if we have the large icon
   bool? hasLargeIcon;
@@ -167,7 +170,8 @@ class NotificationEvent {
     this.text,
     this.message,
     this.timestamp,
-    // this.icon,
+    this.icon,
+    this.smallIcon,
     this.hasLargeIcon,
     this.largeIcon,
     this.canTap,
@@ -191,7 +195,8 @@ class NotificationEvent {
       text: map['text'],
       message: map["message"],
       timestamp: map["timestamp"],
-      // icon: map['icon'],
+      icon: map['icon'],
+      smallIcon: map['smallIcon'],
       hasLargeIcon: map['hasLargeIcon'],
       largeIcon: map['largeIcon'],
       canTap: map["canTap"],

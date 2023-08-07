@@ -30,6 +30,9 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
         private const val NOTIFICATION_CAN_TAP = "canTap"
         private const val NOTIFICATION_KEY = "key"
         private const val NOTIFICATION_UNIQUE_ID = "_id"
+        private const val NOTIFICATION_ICON = "icon"
+        private const val NOTIFICATION_SMALL_ICON = "smallIcon"
+        private const val NOTIFICATION_LARGE_ICON = "largeIcon"
 
         fun genKey(vararg items: Any?): String {
             return Utils.md5(items.joinToString(separator="-"){ "$it" }).slice(IntRange(0, 12))
@@ -49,6 +52,36 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
             map[NOTIFICATION_TIMESTAMP] = sbn.postTime
             map[NOTIFICATION_PACKAGE_NAME] =  sbn.packageName
             map[NOTIFICATION_ID] = sbn.id
+            
+            // This code from https://github.com/jiusanzhou/flutter_notification_listener/
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val smallIcon = notify.smallIcon
+                val largeIcon = notify.getLargeIcon()
+                if (smallIcon != null)  {
+                    try {
+                        map[NOTIFICATION_SMALL_ICON] = convertIconToByteArray(context, smallIcon)
+                    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+                        // android < 12 issue
+                        // https://issuetracker.google.com/issues/240138993?pli=1
+                    }
+                }
+                if (largeIcon != null) {
+                    try {
+                        map[NOTIFICATION_LARGE_ICON] = convertIconToByteArray(context, largeIcon)
+                    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+                        // android < 12 issue
+                        // https://issuetracker.google.com/issues/240138993?pli=1
+                    }
+                }
+
+                try {
+                    val icon = context.packageManager.getApplicationIcon(sbn.packageName)
+                    map[NOTIFICATION_ICON] = convertBitmapToByteArray(icon.toBitmap());
+                } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+                    // android < 12 issue
+                    // https://issuetracker.google.com/issues/240138993?pli=1
+                }
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 map[NOTIFICATION_UID] = sbn.uid
@@ -131,8 +164,10 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
         }
 
         @RequiresApi(Build.VERSION_CODES.M)
-        private fun convertIconToByteArray(context: Context, icon: Icon): ByteArray {
-            return convertBitmapToByteArray(icon.loadDrawable(context).toBitmap())
+        private fun convertIconToByteArray(context: Context, icon: Icon): ByteArray? {
+            val drawable = icon.loadDrawable(context)
+            if (drawable == null) return null
+            return convertBitmapToByteArray(drawable.toBitmap());
         }
 
         private fun convertBitmapToByteArray(bitmap: Bitmap): ByteArray {
