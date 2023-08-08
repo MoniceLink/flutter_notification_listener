@@ -66,12 +66,7 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
                     }
                 }
                 if (largeIcon != null) {
-                    try {
-                        map[NOTIFICATION_LARGE_ICON] = convertIconToByteArray(context, largeIcon)
-                    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
-                        // android < 12 issue
-                        // https://issuetracker.google.com/issues/240138993?pli=1
-                    }
+                    map[NOTIFICATION_LARGE_ICON] = convertIconToByteArray(context, largeIcon)
                 }
 
                 try {
