@@ -15,8 +15,9 @@ Flutter plugin to listen for all incoming notifications for Android.
 ---
 
 > [!IMPORTANT]\
-> This is the fork of [flutter_notification_listener](https://github.com/jiusanzhou/flutter_notification_listener) which using ForegroundService to listen the notifications. This version removes the implementation of ForegroundService and creating new FlutterEngine to run the service. So it can be handled by your own ForegroundService implementation.\
-> If you don't want to create your own ForegroundService, you need to use the original version. [flutter_notification_listener](https://github.com/jiusanzhou/flutter_notification_listener)
+> This is the fork of [jiusanzhou/flutter_notification_listener](https://github.com/jiusanzhou/flutter_notification_listener) which using ForegroundService to listen the notifications. This version removes the implementation of ForegroundService and does not create new FlutterEngine to run the service. So it can be handled by your own ForegroundService implementation.
+> <br>\
+> If you don't want to create your own ForegroundService, you need to use the original version of [flutter_notification_listener](https://github.com/jiusanzhou/flutter_notification_listener).
 
 ## Features
 
