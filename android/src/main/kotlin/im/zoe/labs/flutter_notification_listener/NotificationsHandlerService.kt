@@ -21,42 +21,30 @@ import androidx.annotation.NonNull
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import io.flutter.FlutterInjector
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.EventChannel.StreamHandler
+import io.flutter.plugin.common.EventChannel.EventSink
+import io.flutter.plugin.common.PluginRegistry
 import io.flutter.view.FlutterCallbackInformation
 import org.json.JSONObject
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.HashMap
 
-class NotificationsHandlerService: MethodChannel.MethodCallHandler, NotificationListenerService() {
-    private val queue = ArrayDeque<NotificationEvent>()
-    private lateinit var mBackgroundChannel: MethodChannel
-    private lateinit var mContext: Context
 
+
+class NotificationsHandlerService: MethodChannel.MethodCallHandler, NotificationListenerService() {
     // notification event cache: packageName_id -> event
     private val eventsCache = HashMap<String, NotificationEvent>()
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {
       when (call.method) {
-          "service.initialized" -> {
-              initFinish()
-              return result.success(true)
-          }
-          // this should move to plugin
-          "service.promoteToForeground" -> {
-              // add data
-              val cfg = Utils.PromoteServiceConfig.fromMap(call.arguments as Map<*, *>).apply {
-                  foreground = true
-              }
-              return result.success(promoteToForeground(cfg))
-          }
-          "service.demoteToBackground" -> {
-              return result.success(demoteToBackground())
-          }
           "service.tap" -> {
               // tap the notification
               Log.d(TAG, "tap the notification")
@@ -96,72 +84,15 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
       }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // if get shutdown release the wake lock
-        when (intent?.action) {
-            ACTION_SHUTDOWN -> {
-                (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
-                    newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
-                        if (isHeld) release()
-                    }
-                }
-                Log.i(TAG, "stop notification handler service!")
-                disableServiceSettings(mContext)
-                stopForeground(true)
-                stopSelf()
-            }
-            else -> {
-
-            }
-        }
-        return START_STICKY
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-
-        mContext = this
-
-        // store the service instance
-        instance = this
-
-        Log.i(TAG, "notification listener service onCreate")
-        startListenerService(this)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        Log.i(TAG, "notification listener service onDestroy")
-        val bdi = Intent(mContext, RebootBroadcastReceiver::class.java)
-        // remove notification
-        sendBroadcast(bdi)
-    }
-
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        super.onTaskRemoved(rootIntent)
-        Log.i(TAG, "notification listener service onTaskRemoved")
-    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
-
-        FlutterInjector.instance().flutterLoader().startInitialization(mContext)
-        FlutterInjector.instance().flutterLoader().ensureInitializationComplete(mContext, null)
 
         val evt = NotificationEvent(mContext, sbn)
 
         // store the evt to cache
         eventsCache[evt.uid] = evt
-
-        synchronized(sServiceStarted) {
-            if (!sServiceStarted.get()) {
-                Log.d(TAG, "service is not start try to queue the event")
-                queue.add(evt)
-            } else {
-                Log.d(TAG, "send event to flutter side immediately!")
-                Handler(mContext.mainLooper).post { sendEvent(evt) }
-            }
-        }
+        Handler(mContext.mainLooper).post { sendEvent(evt) }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
@@ -171,75 +102,6 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         // remove the event from cache
         eventsCache.remove(evt.uid)
         Log.d(TAG, "notification removed: ${evt.uid}")
-    }
-
-    private fun initFinish() {
-        Log.d(TAG, "service's flutter engine initialize finished")
-        synchronized(sServiceStarted) {
-            while (!queue.isEmpty()) sendEvent(queue.remove())
-            sServiceStarted.set(true)
-        }
-    }
-
-    private fun promoteToForeground(cfg: Utils.PromoteServiceConfig? = null): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            Log.e(TAG, "promoteToForeground need sdk >= 26")
-            return false
-        }
-
-        if (cfg?.foreground != true) {
-            Log.i(TAG, "no need to start foreground: ${cfg?.foreground}")
-            return false
-        }
-
-        // first is not running already, start at first
-        if (!FlutterNotificationListenerPlugin.isServiceRunning(mContext, this.javaClass)) {
-            Log.e(TAG, "service is not running")
-            return false
-        }
-
-        // get args from store or args
-        val cfg = cfg ?: Utils.PromoteServiceConfig.load(this)
-        // make the service to foreground
-
-        // take a wake lock
-        (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
-            newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
-                setReferenceCounted(false)
-                acquire()
-            }
-        }
-
-        // create a channel for notification
-        val channel = NotificationChannel(CHANNEL_ID, "Flutter Notifications Listener Plugin", NotificationManager.IMPORTANCE_HIGH)
-        val imageId = resources.getIdentifier("ic_launcher", "mipmap", packageName)
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(cfg.title)
-            .setContentText(cfg.description)
-            .setShowWhen(cfg.showWhen ?: false)
-            .setSubText(cfg.subTitle)
-            .setSmallIcon(imageId)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
-
-        Log.d(TAG, "promote the service to foreground")
-        startForeground(ONGOING_NOTIFICATION_ID, notification)
-
-        return true
-    }
-
-    private fun demoteToBackground(): Boolean {
-        Log.d(TAG, "demote the service to background")
-        (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
-            newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
-                if (isHeld) release()
-            }
-        }
-        stopForeground(true)
-        return true
     }
 
     private fun tapNotification(uid: String): Boolean {
@@ -324,36 +186,33 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     companion object {
-
-        var callbackHandle = 0L
-
-        @SuppressLint("StaticFieldLeak")
-        @JvmStatic
-        var instance: NotificationsHandlerService? = null
+        private var eventSink: EventChannel.EventSink? = null
+        private lateinit var mContext: Context
 
         @JvmStatic
         private val TAG = "NotificationsListenerService"
 
-        private const val ONGOING_NOTIFICATION_ID = 100
-        @JvmStatic
-        private val WAKELOCK_TAG = "IsolateHolderService::WAKE_LOCK"
-        @JvmStatic
-        val ACTION_SHUTDOWN = "SHUTDOWN"
-
-        private const val CHANNEL_ID = "flutter_notifications_listener_channel"
-
-        @JvmStatic
-        private var sBackgroundFlutterEngine: FlutterEngine? = null
-        @JvmStatic
-        private val sServiceStarted = AtomicBoolean(false)
-
-        private const val BG_METHOD_CHANNEL_NAME = "flutter_notification_listener/bg_method"
+        private const val LISTENER_METHOD_CHANNEL_NAME = "flutter_notification_listener/listener_method"
+        private const val LISTENER_EVENT_CHANNEL_NAME = "flutter_notification_listener/listener_event"
 
         private const val ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners"
         private const val ACTION_NOTIFICATION_LISTENER_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"
 
-        const val NOTIFICATION_INTENT_KEY = "object"
-        const val NOTIFICATION_INTENT = "notification_event"
+        fun registerWith(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding, context: Context) {
+            mContext = context
+            
+            val channel = EventChannel(flutterPluginBinding.binaryMessenger, LISTENER_EVENT_CHANNEL_NAME)
+
+            channel.setStreamHandler(object : StreamHandler {
+                override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {
+                    eventSink = sink
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    eventSink = null
+                }
+            })
+        }
 
         fun permissionGiven(context: Context): Boolean {
             val packageName = context.packageName
@@ -376,99 +235,17 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
             context.startActivity(Intent(ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return true
         }
-
-        fun enableServiceSettings(context: Context) {
-            toggleServiceSettings(context, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
-        }
-
-        fun disableServiceSettings(context: Context) {
-            toggleServiceSettings(context, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
-        }
-
-        private fun toggleServiceSettings(context: Context, state: Int) {
-            val receiver = ComponentName(context, NotificationsHandlerService::class.java)
-            val pm = context.packageManager
-            pm.setComponentEnabledSetting(receiver, state, PackageManager.DONT_KILL_APP)
-        }
-
-        fun updateFlutterEngine(context: Context) {
-            Log.d(TAG, "call instance update flutter engine from plugin init")
-            instance?.updateFlutterEngine(context)
-            // we need to `finish init` manually
-            instance?.initFinish()
-        }
-    }
-
-    private fun getFlutterEngine(context: Context): FlutterEngine {
-        var eng = FlutterEngineCache.getInstance().get(FlutterNotificationListenerPlugin.FLUTTER_ENGINE_CACHE_KEY)
-        if (eng != null) return eng
-
-        Log.i(TAG, "flutter engine cache is null, create a new one")
-        eng = FlutterEngine(context)
-
-        // ensure initialization
-        FlutterInjector.instance().flutterLoader().startInitialization(context)
-        FlutterInjector.instance().flutterLoader().ensureInitializationComplete(context, arrayOf())
-
-        // call the flutter side init
-        // get the call back handle information
-        val cb = context.getSharedPreferences(FlutterNotificationListenerPlugin.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-            .getLong(FlutterNotificationListenerPlugin.CALLBACK_DISPATCHER_HANDLE_KEY, 0)
-
-        if (cb != 0L) {
-            Log.d(TAG, "try to find callback: $cb")
-            val info = FlutterCallbackInformation.lookupCallbackInformation(cb)
-            val args = DartExecutor.DartCallback(context.assets,
-                FlutterInjector.instance().flutterLoader().findAppBundlePath(), info)
-            // call the callback
-            eng.dartExecutor.executeDartCallback(args)
-        } else {
-            Log.e(TAG, "Fatal: no callback register")
-        }
-
-        FlutterEngineCache.getInstance().put(FlutterNotificationListenerPlugin.FLUTTER_ENGINE_CACHE_KEY, eng)
-        return eng
-    }
-
-    private fun updateFlutterEngine(context: Context) {
-        Log.d(TAG, "update the flutter engine of service")
-        // take the engine
-        val eng = getFlutterEngine(context)
-        sBackgroundFlutterEngine = eng
-
-        // set the method call
-        mBackgroundChannel = MethodChannel(eng.dartExecutor.binaryMessenger, BG_METHOD_CHANNEL_NAME)
-        mBackgroundChannel.setMethodCallHandler(this)
-    }
-
-    private fun startListenerService(context: Context) {
-        Log.d(TAG, "start listener service")
-        synchronized(sServiceStarted) {
-            // promote to foreground
-            // TODO: take from intent, currently just load form store
-            promoteToForeground(Utils.PromoteServiceConfig.load(context))
-
-            // we should to update
-            Log.d(TAG, "service's flutter engine is null, should update one")
-            updateFlutterEngine(context)
-
-            sServiceStarted.set(true)
-        }
-        Log.d(TAG, "service start finished")
     }
 
     private fun sendEvent(evt: NotificationEvent) {
         Log.d(TAG, "send notification event: ${evt.data}")
-        if (callbackHandle == 0L) {
-            callbackHandle = mContext.getSharedPreferences(FlutterNotificationListenerPlugin.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-                .getLong(FlutterNotificationListenerPlugin.CALLBACK_HANDLE_KEY, 0)
+        if (eventSink == null) {
+            Log.d(TAG, "eventSink is null")
+            return
         }
 
-        // why mBackgroundChannel can be null?
-
         try {
-            // don't care about the method name
-            mBackgroundChannel.invokeMethod("sink_event", listOf(callbackHandle, evt.data))
+            eventSink!!.success(evt.data)
         } catch (e: Exception) {
             e.printStackTrace()
         }
