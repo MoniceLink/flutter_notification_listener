@@ -49,6 +49,18 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         methodHandler = this
     }
 
+    private val isNotificationsFetched = AtomicBoolean(false)
+
+    fun fetchActiveNotifications() {
+        if (isNotificationsFetched.get()) return
+        val activeNotifications = getActiveNotifications()
+        activeNotifications.forEach {
+            val ntf = NotificationEvent(mContext, it)
+            eventsCache[ntf.uid] = ntf
+        }
+        isNotificationsFetched.set(true)
+    }
+
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {
       when (call.method) {
           "service.tap" -> {
@@ -83,6 +95,14 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
               }
               return result.success(Utils.Marshaller.marshal(eventsCache[uid]?.mSbn))
           }
+          "service.get_active_notifications" -> {
+                fetchActiveNotifications()
+                val notificationEventsData = List<Map<String, Any?>> (eventsCache.size) { i ->
+                    val evt = eventsCache.values.elementAt(i)
+                    evt.data
+                }
+                return result.success(notificationEventsData)
+          }  
           else -> {
               Log.d(TAG, "unknown method ${call.method}")
               result.notImplemented()
@@ -93,7 +113,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
-
+        fetchActiveNotifications()
         val evt = NotificationEvent(mContext, sbn)
 
         // store the evt to cache

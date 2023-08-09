@@ -64,4 +64,11 @@ class AndroidNotificationsListener {
         .receiveBroadcastStream()
         .map((dynamic event) => AndroidNotificationEvent.fromMap(event));
   }
+
+  static Future<List<AndroidNotificationEvent>> getActiveNotifications() async {
+    return (await _listenerMethodChannel
+            .invokeMethod<List<dynamic>>("service.get_active_notifications"))!
+        .map((dynamic event) => AndroidNotificationEvent.fromMap(event))
+        .toList();
+  }
 }
