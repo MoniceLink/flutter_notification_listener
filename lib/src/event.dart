@@ -54,7 +54,7 @@ class Action {
 
   Future<bool> tap() async {
     if (_evt == null) throw Exception("The notification is null");
-    return NotificationsListener.tapNotificationAction(
+    return AndroidNotificationsListener.tapNotificationAction(
       _evt!.uniqueId!,
       id!,
     );
@@ -77,7 +77,7 @@ class Action {
       throw Exception("You must offer data with resultKey from inputs");
     }
 
-    return NotificationsListener.postActionInputs(
+    return AndroidNotificationsListener.postActionInputs(
       _evt!.uniqueId!,
       id!,
       map,
@@ -225,12 +225,12 @@ class NotificationEvent {
   Future<bool> tap() {
     if (canTap == null || canTap == false)
       throw Exception("The notification can not be tapped");
-    return NotificationsListener.tapNotification(uniqueId!);
+    return AndroidNotificationsListener.tapNotification(uniqueId!);
   }
 
   /// get full notification
   Future<dynamic> getFull() {
-    return NotificationsListener.getFullNotification(uniqueId!);
+    return AndroidNotificationsListener.getFullNotification(uniqueId!);
   }
 }
 

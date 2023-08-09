@@ -6,7 +6,7 @@ import './event.dart';
 typedef EventCallbackFunc = void Function(NotificationEvent evt);
 
 /// NotificationsListener
-class NotificationsListener {
+class AndroidNotificationsListener {
   static const CHANNELID = "flutter_notification_listener";
   static const SEND_PORT_NAME = "notifications_send_port";
 
