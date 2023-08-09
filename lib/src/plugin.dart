@@ -1,9 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
-
-import './event.dart';
-
-typedef EventCallbackFunc = void Function(NotificationEvent evt);
+import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 
 /// NotificationsListener
 class AndroidNotificationsListener {
@@ -62,9 +59,9 @@ class AndroidNotificationsListener {
   }
 
   /// listen the notification events
-  static Stream<NotificationEvent> get onNotificationEvent {
+  static Stream<AndroidNotificationEvent> get onNotificationEvent {
     return _listenerEventChannel
         .receiveBroadcastStream()
-        .map((dynamic event) => NotificationEvent.fromMap(event));
+        .map((dynamic event) => AndroidNotificationEvent.fromMap(event));
   }
 }
