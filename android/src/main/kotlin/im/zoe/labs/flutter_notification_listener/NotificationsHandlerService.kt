@@ -43,6 +43,12 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     // notification event cache: packageName_id -> event
     private val eventsCache = HashMap<String, NotificationEvent>()
 
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "onCreate")
+        methodHandler = this
+    }
+
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {
       when (call.method) {
           "service.tap" -> {
@@ -188,6 +194,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     companion object {
         private var eventSink: EventChannel.EventSink? = null
         private lateinit var mContext: Context
+        private lateinit var methodHandler: MethodChannel.MethodCallHandler
 
         @JvmStatic
         private val TAG = "NotificationsListenerService"
@@ -201,9 +208,12 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         fun registerWith(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding, context: Context) {
             mContext = context
             
-            val channel = EventChannel(flutterPluginBinding.binaryMessenger, LISTENER_EVENT_CHANNEL_NAME)
+            val eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, LISTENER_EVENT_CHANNEL_NAME)
+            val channel = MethodChannel(flutterPluginBinding.binaryMessenger, LISTENER_METHOD_CHANNEL_NAME)
 
-            channel.setStreamHandler(object : StreamHandler {
+            channel.setMethodCallHandler(methodHandler)
+            
+            eventChannel.setStreamHandler(object : StreamHandler {
                 override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {
                     eventSink = sink
                 }
