@@ -33,6 +33,7 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
         private const val NOTIFICATION_ICON = "icon"
         private const val NOTIFICATION_SMALL_ICON = "smallIcon"
         private const val NOTIFICATION_LARGE_ICON = "largeIcon"
+        private const val NOTIFICATION_APP_NAME = "appName"
 
         fun genKey(vararg items: Any?): String {
             return Utils.md5(items.joinToString(separator="-"){ "$it" }).slice(IntRange(0, 12))
@@ -77,6 +78,13 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
                     // https://issuetracker.google.com/issues/240138993?pli=1
                 }
             }
+
+            // get application name
+            try {
+                val appInfo = context.packageManager.getApplicationInfo(sbn.packageName, 0)
+                val appName = context.packageManager.getApplicationLabel(appInfo).toString()
+                map[NOTIFICATION_APP_NAME] = appName
+            } catch (e: android.content.pm.PackageManager.NameNotFoundException) {}
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 map[NOTIFICATION_UID] = sbn.uid

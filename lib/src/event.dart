@@ -121,8 +121,8 @@ class AndroidNotificationEvent {
   /// the content of the notification
   String? text;
 
-  /// DEPRECATE
-  String? message;
+  /// App name of the notification
+  String? appName;
 
   /// icon of the notification which setted by setSmallIcon,
   /// at most time this is icon of the application package.
@@ -169,7 +169,7 @@ class AndroidNotificationEvent {
     this.packageName,
     this.title,
     this.text,
-    this.message,
+    this.appName,
     this.timestamp,
     this.icon,
     this.smallIcon,
@@ -194,7 +194,7 @@ class AndroidNotificationEvent {
       packageName: map['package_name'],
       title: map['title'],
       text: map['text'],
-      message: map["message"],
+      appName: map["appName"],
       timestamp: map["timestamp"],
       icon: map['icon'],
       smallIcon: map['smallIcon'],
