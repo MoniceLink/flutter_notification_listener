@@ -128,6 +128,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         // remove the event from cache
         eventsCache.remove(evt.uid)
         Log.d(TAG, "notification removed: ${evt.uid}")
+        Handler(mContext.mainLooper).post { sendRemovedEvent(evt.uid) }
     }
 
     private fun tapNotification(uid: String): Boolean {
@@ -213,6 +214,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
     companion object {
         private var eventSink: EventChannel.EventSink? = null
+        private var eventRemovedSink: EventChannel.EventSink? = null
         private lateinit var mContext: Context
         private lateinit var methodHandler: MethodChannel.MethodCallHandler
 
@@ -221,6 +223,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
         private const val LISTENER_METHOD_CHANNEL_NAME = "flutter_notification_listener/listener_method"
         private const val LISTENER_EVENT_CHANNEL_NAME = "flutter_notification_listener/listener_event"
+        private const val LISTENER_EVENT_REMOVED_CHANNEL_NAME = "flutter_notification_listener/listener_event_removed"
 
         private const val ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners"
         private const val ACTION_NOTIFICATION_LISTENER_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"
@@ -229,6 +232,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
             mContext = context
             
             val eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, LISTENER_EVENT_CHANNEL_NAME)
+            val eventRemovedChannel = EventChannel(flutterPluginBinding.binaryMessenger, LISTENER_EVENT_REMOVED_CHANNEL_NAME)
             val channel = MethodChannel(flutterPluginBinding.binaryMessenger, LISTENER_METHOD_CHANNEL_NAME)
 
             channel.setMethodCallHandler(methodHandler)
@@ -240,6 +244,16 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
+                }
+            })
+
+            eventRemovedChannel.setStreamHandler(object : StreamHandler {
+                override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {
+                    eventRemovedSink = sink
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    eventRemovedSink = null
                 }
             })
         }
@@ -264,6 +278,20 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         fun openPermissionSettings(context: Context): Boolean {
             context.startActivity(Intent(ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return true
+        }
+    }
+
+    private fun sendRemovedEvent(uid: String) {
+        Log.d(TAG, "send notification removed event: $uid")
+        if (eventRemovedSink == null) {
+            Log.d(TAG, "eventRemovedSink is null")
+            return
+        }
+
+        try {
+            eventRemovedSink!!.success(uid)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

@@ -16,6 +16,9 @@ class AndroidNotificationsListener {
   static const EventChannel _listenerEventChannel =
       const EventChannel('$CHANNELID/listener_event');
 
+  static const EventChannel _listenerEventRemovedChannel =
+      const EventChannel('$CHANNELID/listener_event_removed');
+
   /// Check have permission or not
   static Future<bool?> get hasPermission async {
     return await _pluginMethodChannel.invokeMethod('plugin.hasPermission');
@@ -63,6 +66,12 @@ class AndroidNotificationsListener {
     return _listenerEventChannel
         .receiveBroadcastStream()
         .map((dynamic event) => AndroidNotificationEvent.fromMap(event));
+  }
+
+  static Stream<String> get onNotificationRemovedEvent {
+    return _listenerEventRemovedChannel
+        .receiveBroadcastStream()
+        .map((dynamic event) => event.toString());
   }
 
   static Future<List<AndroidNotificationEvent>> getActiveNotifications() async {
