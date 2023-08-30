@@ -34,6 +34,7 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
         private const val NOTIFICATION_SMALL_ICON = "smallIcon"
         private const val NOTIFICATION_LARGE_ICON = "largeIcon"
         private const val NOTIFICATION_APP_NAME = "appName"
+        private const val NOTIFICATION_VISIBILITY = "visibility"
 
         fun genKey(vararg items: Any?): String {
             return Utils.md5(items.joinToString(separator="-"){ "$it" }).slice(IntRange(0, 12))
@@ -59,13 +60,9 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
                 val smallIcon = notify.smallIcon
                 val largeIcon = notify.getLargeIcon()
                 if (smallIcon != null)  {
-                    try {
-                        map[NOTIFICATION_SMALL_ICON] = convertIconToByteArray(context, smallIcon)
-                    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
-                        // android < 12 issue
-                        // https://issuetracker.google.com/issues/240138993?pli=1
-                    }
+                    map[NOTIFICATION_SMALL_ICON] = convertIconToByteArray(context, smallIcon)
                 }
+                
                 if (largeIcon != null) {
                     map[NOTIFICATION_LARGE_ICON] = convertIconToByteArray(context, largeIcon)
                 }
@@ -110,6 +107,8 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
 
             map[NOTIFICATION_ACTIONS] = getActions(context, notify)
 
+            map[NOTIFICATION_VISIBILITY] = notify.visibility
+
             return map
         }
 
@@ -122,7 +121,12 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
             Notification.EXTRA_BIG_TEXT,
             Notification.EXTRA_INFO_TEXT,
             Notification.EXTRA_SHOW_WHEN,
-            Notification.EXTRA_LARGE_ICON
+            Notification.EXTRA_LARGE_ICON,
+            Notification.EXTRA_PICTURE,
+            Notification.EXTRA_PICTURE_CONTENT_DESCRIPTION,
+            Notification.EXTRA_PROGRESS,
+            Notification.EXTRA_PROGRESS_INDETERMINATE,
+            Notification.EXTRA_PROGRESS_MAX,
             // Notification.EXTRA_LARGE_ICON_BIG
         )
 

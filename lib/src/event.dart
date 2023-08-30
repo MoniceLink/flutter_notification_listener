@@ -121,6 +121,12 @@ class AndroidNotificationEvent {
   /// the content of the notification
   String? text;
 
+  String? subText;
+
+  String? infoText;
+
+  String? bigText;
+
   /// App name of the notification
   String? appName;
 
@@ -156,6 +162,21 @@ class AndroidNotificationEvent {
   /// actions of notification
   List<Action>? actions;
 
+  bool? showWhen;
+
+  /// the picture of the notification
+  Uint8List? picture;
+
+  String? pictureDescription;
+
+  int? progress;
+
+  int? progressMax;
+
+  bool? progressIndeterminate;
+
+  NotificationVisibility visibility;
+
   /// the raw notifaction data from android
   dynamic _data;
 
@@ -169,6 +190,9 @@ class AndroidNotificationEvent {
     this.packageName,
     this.title,
     this.text,
+    this.subText,
+    this.infoText,
+    this.bigText,
     this.appName,
     this.timestamp,
     this.icon,
@@ -176,6 +200,13 @@ class AndroidNotificationEvent {
     this.hasLargeIcon,
     this.largeIcon,
     this.canTap,
+    this.showWhen,
+    this.picture,
+    this.pictureDescription,
+    this.progress,
+    this.progressMax,
+    this.progressIndeterminate,
+    this.visibility = NotificationVisibility.public,
   });
 
   Map<dynamic, dynamic>? get raw => _data;
@@ -194,6 +225,9 @@ class AndroidNotificationEvent {
       packageName: map['package_name'],
       title: map['title'],
       text: map['text'],
+      subText: map['subText'],
+      infoText: map['infoText'],
+      bigText: map['bigText'],
       appName: map["appName"],
       timestamp: map["timestamp"],
       icon: map['icon'],
@@ -201,6 +235,13 @@ class AndroidNotificationEvent {
       hasLargeIcon: map['hasLargeIcon'],
       largeIcon: map['largeIcon'],
       canTap: map["canTap"],
+      showWhen: map["showWhen"],
+      picture: map["picture"],
+      pictureDescription: map["pictureContentDescription"],
+      progress: map["progress"],
+      progressMax: map["progressMax"],
+      progressIndeterminate: map["progressIndeterminate"],
+      visibility: NotificationVisibility.fromValue(map["visibility"]),
     );
 
     // set the raw data
@@ -238,4 +279,18 @@ class AndroidNotificationEvent {
 /// newEvent package level function create event from map
 AndroidNotificationEvent newEvent(Map<dynamic, dynamic> data) {
   return AndroidNotificationEvent.fromMap(data);
+}
+
+enum NotificationVisibility {
+  secret(-1),
+  private(0),
+  public(1);
+
+  final int value;
+  const NotificationVisibility(this.value);
+
+  factory NotificationVisibility.fromValue(int value) {
+    return NotificationVisibility.values
+        .firstWhere((element) => element.value == value);
+  }
 }
